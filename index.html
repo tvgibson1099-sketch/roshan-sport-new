@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>روشن Sport</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dashjs/4.7.4/dash.all.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <style>
+        :root{--bg:#07111f;--bg2:#0f172a;--card:rgba(255,255,255,.09);--border:rgba(255,255,255,.2);--accent:#22c55e;--blue:#3b82f6;--text:#fff;--muted:#aab7c7;--danger:#ef4444}
+        *{box-sizing:border-box}
+        html,body{margin:0;min-height:100%;background:linear-gradient(135deg,var(--bg),var(--bg2));color:#fff;font-family:Cairo,sans-serif}
+        body{min-height:100vh;overflow-x:hidden}
+        button,input{font-family:inherit}
+        
+        header{
+            height:65px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:10px;
+            background:rgba(10,15,26,0.65);
+            backdrop-filter:blur(20px);
+            -webkit-backdrop-filter:blur(20px);
+            border-bottom:1px solid rgba(255,255,255,0.08);
+            position:sticky;
+            top:0;
+            z-index:5000;
+            padding:0 70px;
+        }
+        header img{width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(255,255,255,0.4));border-radius:50%}
+        header h1{font-size:20px;margin:0;font-weight:900;letter-spacing:0.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 8px rgba(0,0,0,0.6);}
+        
+        .floating-btn{position:fixed;top:11px;width:44px;height:44px;border-radius:50px;z-index:6000;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:0.3s;box-shadow:0 8px 32px 0 rgba(31,38,135,0.37);}
+        .floating-btn:hover{background:rgba(255,255,255,.22);border-color:var(--blue);transform:scale(1.05);}
+        
+        #matches-btn{left:16px; right:auto;}
+        #notif-btn{right:16px;}
+        
+        .badge{position:absolute;right:-4px;top:-5px;width:19px;height:19px;border-radius:50%;background:var(--danger);font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center}
+        
+        #welcome-overlay{position:fixed;inset:0;background:#07111f;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
+        .welcome-logo{width:105px;height:105px;object-fit:contain;animation:pulse 1.4s infinite alternate;border-radius:50%;box-shadow:0 0 50px rgba(255,255,255,0.3);}.welcome-text{margin-top:18px;font-size:23px;font-weight:900;text-shadow:0 0 20px #3b82f6}
+        @keyframes pulse{to{transform:scale(1.08);filter:drop-shadow(0 0 25px rgba(59,130,246,.7))}}
+        
+        #ad-slider{width:90%;max-width:450px;aspect-ratio:3/4;margin:15px auto;border-radius:20px;overflow:hidden;background:#000;border:1px solid var(--border);position:relative;direction:ltr;box-shadow:0 15px 35px rgba(0,0,0,0.5)}
+        .slides-track{height:100%;display:flex;transition:transform .45s ease}.slide{min-width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#000}.slide img{width:100%;height:100%;object-fit:contain}
+        .slide-controls{position:absolute;left:0;right:0;bottom:13px;display:flex;justify-content:center;gap:7px}.dot{width:9px;height:9px;border-radius:20px;background:rgba(255,255,255,.45);cursor:pointer}.dot.active{width:28px;background:var(--blue)}
+        
+        #app{padding:15px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px}
+        .category-box,.channel-item{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:20px;text-align:center;cursor:pointer;transition:.25s;backdrop-filter:blur(15px);-webkit-backdrop-filter:blur(15px);box-shadow:0 8px 32px 0 rgba(31,38,135,0.37);}
+        .category-box{padding:11px}.category-box:hover,.channel-item:hover{transform:translateY(-3px);background:rgba(255,255,255,0.2);border-color:#3b82f6}
+        .category-img{width:100%;aspect-ratio:1;border-radius:15px;object-fit:cover;background:#000}.category-title{font-weight:800;font-size:14px;margin-top:7px}
+        
+        #channel-modal,#notif-modal,#error-popup,#matches-modal{display:none;position:fixed;inset:0;z-index:10000}
+        #channel-modal,#matches-modal{background:rgba(5,12,22,.96);backdrop-filter:blur(22px);flex-direction:column}
+        
+        /* تنسيق الهيدر الزجاجي الأنيق لصفحة الأقسام والقنوات */
+        .channel-modal-header,.matches-modal-header{min-height:65px;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(10,15,26,0.65);backdrop-filter:blur(20px)}
+        .channel-modal-title,.matches-modal-title{font-size:18px;font-weight:900;display:flex;align-items:center;gap:10px}
+        
+        .close-chan-btn,.close-matches-btn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.1);color:#fff;cursor:pointer;border:1px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;transition:0.2s}
+        .close-chan-btn:hover,.close-matches-btn:hover{background:rgba(255,255,255,0.2);border-color:var(--blue);transform:scale(1.05)}
+        
+        .channel-content{padding:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:14px;overflow:auto;align-content:start;flex:1}
+        .channel-item{padding:11px;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+        .channel-item img{width:57px;height:57px;object-fit:contain;margin-bottom:7px}.channel-name{font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+        
+        #telegram-modal{display:none;position:fixed;inset:0;z-index:20000;align-items:center;justify-content:center;padding:20px;background:rgba(3,9,18,.78);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+        #telegram-modal .glass-box{animation:tgIn .35s ease both}
+        @keyframes tgIn{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+        
+        #notif-modal,#error-popup{align-items:center;justify-content:center;background:rgba(0,0,0,.78);backdrop-filter:blur(17px);padding:20px;}
+        .glass-box,.notif-content,.error-box{width:min(100%,500px);padding:26px;border-radius:28px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);box-shadow:0 25px 70px rgba(0,0,0,0.5);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+        .glass-box{text-align:center}.glass-box img{width:82px;height:82px;object-fit:contain;filter:drop-shadow(0 8px 24px rgba(34,158,217,.28))}.glass-box h2{font-size:21px;margin:12px 0 7px}.glass-box p{color:var(--muted);font-size:14px;line-height:1.8;margin:0}
+        
+        /* تصميم صفحة جدول المباريات */
+        .matches-body { padding: 20px; overflow-y: auto; flex: 1; display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 15px; -webkit-overflow-scrolling: touch; align-content: start; }
+        
+        .match-card { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 18px; padding: 16px 14px; transition: all 0.3s ease; display: flex; flex-direction: column; gap: 12px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); height: fit-content; }
+        .match-card:hover { transform: translateY(-2px); background: rgba(255,255,255,0.13); border-color: rgba(59,130,246,0.5); }
+        
+        .match-teams { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+        .team-col { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; min-width: 0; }
+        .team-col img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.4)); border-radius: 50%; }
+        .team-name { font-size: 12px; font-weight: 800; color: #f8fafc; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+        
+        .score-col { display: flex; flex-direction: column; align-items: center; gap: 6px; justify-content: center; min-width: 75px; }
+        .match-score { font-size: 15px; font-weight: 900; color: #fff; text-align: center; line-height: 1.2; }
+        .match-score.numeric { font-size: 18px; letter-spacing: 1px; direction: ltr; font-family: monospace; }
+        
+        .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 10px; font-size: 10px; font-weight: 800; white-space: nowrap; }
+        .status-badge.live { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .status-badge.finished { background: rgba(255, 255, 255, 0.08); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .status-badge.upcoming { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+        
+        .dot-live { width: 5px; height: 5px; border-radius: 50%; background: #ef4444; animation: blink 1s infinite alternate; }
+        .dot-finished { width: 5px; height: 5px; border-radius: 50%; background: #64748b; }
+        .dot-upcoming { width: 5px; height: 5px; border-radius: 50%; background: #f59e0b; }
+        @keyframes blink { from { opacity: 1; } to { opacity: 0.3; } }
+        
+        .match-details { padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; font-weight: 700; gap: 4px; }
+        .match-details div { display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .match-details i { font-size: 11px; color: rgba(255,255,255,0.45); }
+        
+        .loading-spinner { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--blue); border-radius: 50%; animation: fa-spin 0.8s ease-in-out infinite; margin: 0 auto 12px; }
+        
+        .tg-btns{display:flex;justify-content:center;margin-top:20px}.tg-join{width:min(100%,330px);display:flex;align-items:center;justify-content:center;gap:9px;padding:13px 20px;border-radius:16px;background:rgba(34,158,217,.9);color:#fff;border:1px solid rgba(255,255,255,.22);font-weight:900;cursor:pointer;text-decoration:none;box-shadow:0 10px 30px rgba(34,158,217,.22);transition:.2s}.tg-join:hover{transform:translateY(-2px);filter:brightness(1.08)}
+        .notif-content{max-height:82vh;overflow:auto}.notif-item{background:rgba(255,255,255,.1);border:1px solid var(--border);border-radius:15px;padding:13px;margin-bottom:10px;backdrop-filter:blur(10px)}.notif-header{display:flex;align-items:center;gap:9px;margin-bottom:7px}.notif-header img{width:35px;height:35px;border-radius:50%;object-fit:cover}.verified-badge{color:#1d9bf0}
+        .error-box{text-align:center;border-color:rgba(239,68,68,.7)}.error-icon{font-size:62px;color:var(--danger)}
+        footer{margin-top:30px;padding:15px;text-align:center;background:rgba(255,255,255,.04);border-top:1px solid var(--border)}footer img{width:40px;border-radius:50%;box-shadow:0 0 15px rgba(255,255,255,0.3)}.footer-title{font-weight:900;font-size:17px}.footer-copy{font-size:11px;color:#8492a5}
+        
+        /* ================= PLAYER ================= */
+        #player-modal{display:none;position:fixed;inset:0;width:100vw;height:100dvh;background:#000;z-index:30000;overflow:hidden}
+        .player-wrapper{position:relative;width:100%;height:100%;background:#000;overflow:hidden;touch-action:manipulation}
+        #player{width:100%;height:100%;background:#000}
+        .player-wrapper .plyr,.player-wrapper .plyr video{width:100%;height:100%}.player-wrapper .plyr video{object-fit:contain}
+        .player-ui{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s,visibility .22s}
+        .player-wrapper.ui-visible .player-ui{opacity:1;visibility:visible;pointer-events:auto}
+        .player-top{position:absolute;left:0;right:0;top:0;min-height:78px;padding:12px 14px;z-index:3500;display:flex;align-items:flex-start;justify-content:space-between;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,.88),transparent)}
+        .player-top>*{pointer-events:auto}.player-brand{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:16px;background:rgba(10,10,12,.48);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(18px)}
+        .player-brand img{width:31px;height:31px;object-fit:contain;border-radius:50%}.player-brand span{font-weight:900;font-size:14px}
+        .back-player{width:43px;height:43px;border:1px solid rgba(255,255,255,.22);border-radius:50%;background:rgba(10,10,12,.48);color:#fff;cursor:pointer;backdrop-filter:blur(18px);font-size:18px;display:flex;align-items:center;justify-content:center}
+        .center-play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3550;width:74px;height:74px;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(12,14,18,.48);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(18px);font-size:26px}
+        .server-panel{position:absolute;top:50%;right:13px;z-index:3600;width:min(190px,calc(100% - 26px));padding:12px;border-radius:20px;background:rgba(8,10,14,.62);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(24px);box-shadow:0 20px 60px rgba(0,0,0,.55);transform:translateY(-50%)}
+        .server-panel-title{font-size:12px;font-weight:900;text-align:center;margin-bottom:9px}.server-buttons{display:flex;flex-direction:column;gap:8px}.server-button,.single-server-name{width:100%;padding:10px 8px;border-radius:13px;color:#fff;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.15);font-size:12px;font-weight:900;text-align:center}.server-button{cursor:pointer}.server-button.active{background:rgba(37,99,235,.78);border-color:rgba(147,197,253,.9)}
+        .server-panel-hint{font-size:9px;color:#b8c2d1;text-align:center;margin-top:8px}
+        .volume-panel{position:absolute;top:50%;left:13px;z-index:3600;transform:translateY(-50%);width:48px;padding:8px 6px;border-radius:22px;background:rgba(8,10,14,.62);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(24px);display:flex;flex-direction:column;align-items:center;gap:8px}
+        .volume-btn{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}.volume-level{writing-mode:vertical-rl;direction:rtl;appearance:none;width:5px;height:100px;border-radius:10px;accent-color:#3b82f6;cursor:pointer}.volume-percent{font-size:9px;font-weight:900;color:#cbd5e1}
+        .player-status{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3700;min-width:225px;padding:18px;text-align:center;border-radius:18px;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.17);backdrop-filter:blur(20px);display:none}.player-status.show{display:block}.player-status i{font-size:28px;margin-bottom:9px}.player-status-text{font-size:13px;font-weight:800}
+        .plyr--video{height:100%!important}.plyr__controls{background:linear-gradient(to top,rgba(0,0,0,.94),transparent)!important;padding:16px 20px 20px!important}.plyr__control{color:#fff!important}.player-wrapper:not(.ui-visible) .plyr__controls{opacity:0!important;pointer-events:none!important}.player-wrapper.ui-visible .plyr__controls{opacity:1!important}
+        @media(max-width:600px){.player-brand{padding:6px 9px}.player-brand span{font-size:12px}.back-player{width:40px;height:40px}.center-play{width:66px;height:66px;font-size:23px}.server-panel{right:8px;width:min(165px,calc(100% - 16px))}.volume-panel{left:8px;width:43px}.volume-level{height:88px}}
+        
+        #telegram-modal{display:none;position:fixed;inset:0;z-index:20000;align-items:center;justify-content:center;padding:20px;background:rgba(2,7,16,.82);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);}
+        #telegram-modal .telegram-glass{width:min(92%,430px);text-align:center;padding:28px 22px 24px;border-radius:30px;background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.055));border:1px solid rgba(255,255,255,.20);box-shadow:0 28px 90px rgba(0,0,0,.58),inset 0 1px 0 rgba(255,255,255,.12);animation:tgIn .38s cubic-bezier(.2,.8,.2,1) both;}
+        #telegram-modal .telegram-glass>img{width:76px;height:76px;object-fit:contain;border-radius:22px;margin:0 auto 13px;display:block;}
+        #telegram-modal .telegram-glass h2{margin:0 0 9px;font-size:22px;font-weight:900;}
+        #telegram-modal .telegram-glass p{margin:0 auto;max-width:340px;line-height:1.75;color:rgba(255,255,255,.70);font-size:13px;}
+        .telegram-actions{display:flex;flex-direction:column;gap:10px;margin-top:20px;}
+        .telegram-actions .tg-action{width:100%;min-height:50px;padding:0 16px;border-radius:17px;box-sizing:border-box;border:1px solid rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;gap:9px;font-family:inherit;font-size:15px;font-weight:900;cursor:pointer;text-decoration:none;transition:transform .16s ease,background .16s ease,border-color .16s ease;-webkit-tap-highlight-color:transparent;}
+        .telegram-actions .tg-action:active{transform:scale(.975)}
+        .telegram-actions .tg-join{color:#fff;background:rgba(35,158,217,.82);border-color:rgba(110,215,255,.40);box-shadow:0 10px 28px rgba(35,158,217,.18);}
+        .telegram-actions .tg-later{color:#fff;background:rgba(255,255,255,.095);}
+        .telegram-actions .tg-never{color:rgba(255,255,255,.72);background:rgba(255,255,255,.045);font-size:13px;}
+    </style>
+</head>
+<body>
+
+    <div id="welcome-overlay">
+        <img src="https://e.top4top.io/p_3899m302w0.png" class="welcome-logo" alt="Logo">
+        <div class="welcome-text">روشن Sport</div>
+    </div>
+
+    <!-- الأزرار العلوية -->
+    <button id="matches-btn" class="floating-btn" onclick="openMatches()" title="جدول المباريات">
+        <i class="fas fa-calendar-days"></i>
+    </button>
+    
+    <button id="notif-btn" class="floating-btn" onclick="openNotifs()" title="الإشعارات">
+        <i class="fas fa-bell"></i>
+        <span id="notif-count" class="badge" style="display:none"></span>
+    </button>
+
+    <header>
+        <button id="back-btn" class="floating-btn" style="display:none; left:16px; right:auto;" onclick="closeChannels()" title="رجوع">
+            <i class="fas fa-arrow-right"></i>
+        </button>
+        <img src="https://e.top4top.io/p_3899m302w0.png" alt="Logo">
+        <h1 id="main-title">روشن Sport</h1>
+    </header>
+
+    <div id="ad-slider">
+        <div class="slides-track" id="slides-track"></div>
+        <div class="slide-controls" id="slide-dots"></div>
+    </div>
+
+    <div id="app"></div>
+
+    <footer>
+        <img src="https://e.top4top.io/p_3899m302w0.png" alt="Logo">
+        <div class="footer-title">روشن Sport</div>
+        <div class="footer-copy">© 2026 جميع الحقوق محفوظة</div>
+    </footer>
+
+    <!-- نافذة جدول المباريات -->
+    <div id="matches-modal">
+        <div class="matches-modal-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button class="close-matches-btn" onclick="closeMatches(true)" title="رجوع">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <div class="matches-modal-title"><i class="fas fa-calendar-days" style="color:var(--blue);"></i> جدول المباريات</div>
+            </div>
+        </div>
+        <div class="matches-body" id="matches-grid">
+            <div style="grid-column: 1/-1; text-align: center; padding: 50px 0;">
+                <div class="loading-spinner"></div>
+                <div style="color:var(--muted);font-weight:700;">جاري تحميل المباريات...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة القنوات المحدثة بزر عودة زجاجي أنيق بدل الـ X -->
+    <div id="channel-modal">
+        <div class="channel-modal-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button class="close-chan-btn" onclick="closeChannels()" title="رجوع">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <div class="channel-modal-title" id="chan-modal-title"><i class="fas fa-tv" style="color:var(--blue);"></i> القنوات</div>
+            </div>
+        </div>
+        <div class="channel-content" id="channels-list"></div>
+    </div>
+
+    <!-- نافذة الإشعارات -->
+    <div id="notif-modal">
+        <div class="notif-content">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+                <h2 style="margin:0;font-size:18px;font-weight:900">الإشعارات</h2>
+                <button class="close-matches-btn" onclick="closeNotifs()" style="border:none;"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div id="notifs-list"></div>
+        </div>
+    </div>
+
+    <!-- نافذة الخطأ -->
+    <div id="error-popup">
+        <div class="error-box glass-box">
+            <i class="fas fa-triangle-exclamation error-icon"></i>
+            <h2>عذراً! هذا القسم فارغ</h2>
+            <p>لا توجد قنوات متاحة في هذا القسم حالياً.</p>
+            <button class="tg-join" style="margin:20px auto 0;width:auto;padding:10px 25px;" onclick="closeError()">حسناً</button>
+        </div>
+    </div>
+
+    <!-- نافذة التيليجرام -->
+    <div id="telegram-modal" aria-hidden="true">
+        <div class="telegram-glass">
+            <img src="https://e.top4top.io/p_3899m302w0.png" alt="Logo">
+            <h2>انضم إلى قناة روشن Sport</h2>
+            <p>اشترك في قناتنا على تيليجرام ليصلك كل جديد وتنبيهات المباريات والبث.</p>
+            <div class="telegram-actions">
+                <a href="https://t.me/roshansport" target="_blank" class="tg-action tg-join" onclick="closeTelegramModal(true)">
+                    <i class="fab fa-telegram fa-lg"></i> انضم الآن
+                </a>
+                <button type="button" class="tg-action tg-later" onclick="closeTelegramModal(false)">لاحقاً</button>
+                <button type="button" class="tg-action tg-never" onclick="closeTelegramModal(true)">لا تظهر لي مجدداً</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- مشغل الفيديو -->
+    <div id="player-modal">
+        <div class="player-wrapper" id="player-wrapper">
+            <video id="player" playsinline crossorigin="anonymous"></video>
+            <div class="player-ui">
+                <div class="player-top">
+                    <div class="player-brand">
+                        <img src="https://e.top4top.io/p_3899m302w0.png" alt="Logo">
+                        <span>روشن Sport</span>
+                    </div>
+                    <button class="back-player" onclick="closePlayer(true)"><i class="fas fa-arrow-right"></i></button>
+                </div>
+                <div class="center-play" id="center-play" onclick="togglePlay(event)"><i class="fas fa-play"></i></div>
+                <div class="server-panel" id="server-panel">
+                    <div class="server-panel-title"><i class="fas fa-server"></i> مصادر البث</div>
+                    <div class="server-buttons" id="server-buttons"></div>
+                </div>
+                <div class="volume-panel" id="volume-panel">
+                    <button class="volume-btn" id="mute-btn" onclick="toggleMute(event)"><i class="fas fa-volume-high"></i></button>
+                    <input type="range" class="volume-level" id="volume-level" min="0" max="1" step="0.05" value="0.8" oninput="setVolume(this.value,event)">
+                    <span class="volume-percent" id="volume-percent">80%</span>
+                </div>
+                <div class="player-status" id="player-status">
+                    <i class="fas fa-circle-notch fa-spin"></i>
+                    <div class="player-status-text">جاري الاتصال...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        'use strict';
+        const fb={
+            apiKey:"AIzaSyDpDzxGRoFzN9Id260ecpdIVL-0Q_QcZVI",
+            authDomain:"roshan-sport.firebaseapp.com",
+            projectId:"roshan-sport",
+            storageBucket:"roshan-sport.firebasestorage.app",
+            messagingSenderId:"80765154303",
+            appId:"1:80765154303:web:b09e85b2613982dddcedca",
+            measurementId:"G-R5R5MVFSW9"
+        };
+        firebase.initializeApp(fb);
+        const db=firebase.firestore();
+        const $=id=>document.getElementById(id);
+
+        function escapeHTML(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]||c))}
+        function show(id,d='flex'){ $(id).style.display=d }
+        function hide(id){$(id).style.display='none'}
+
+        function checkWelcomeScreen(){
+            const o=$('welcome-overlay');
+            if(localStorage.getItem('roshan_welcomed')==='true'){
+                o.style.display='none';
+                setTimeout(checkTelegramModal, 700);
+                return;
+            }
+            setTimeout(()=>{
+                o.style.opacity='0';
+                setTimeout(()=>{
+                    o.style.display='none';
+                    setTimeout(checkTelegramModal, 300);
+                },500);
+                localStorage.setItem('roshan_welcomed','true');
+            },4000);
+        }
+
+        function checkTelegramModal(){
+            if(localStorage.getItem('roshan_telegram_never_v2')==='true')return;
+            show('telegram-modal', 'flex');
+            $('telegram-modal').setAttribute('aria-hidden','false');
+        }
+
+        function closeTelegramModal(neverAgain=false){
+            if(neverAgain) localStorage.setItem('roshan_telegram_never_v2','true');
+            $('telegram-modal').setAttribute('aria-hidden','true');
+            hide('telegram-modal');
+        }
+
+        let currentSlide=0,slideTimer=null;
+        async function loadAds(){
+            const track=$('slides-track'),dots=$('slide-dots');
+            track.innerHTML='';dots.innerHTML='';
+            try{
+                const snap=await db.collection('ads').orderBy('timestamp','asc').get();
+                let i=0;
+                snap.forEach(doc=>{
+                    const ad=doc.data();
+                    if(!ad.imageUrl)return;
+                    track.innerHTML+=`<div class="slide"><img src="${escapeHTML(ad.imageUrl)}"></div>`;
+                    dots.innerHTML+=`<div class="dot ${i?'':'active'}" onclick="goToSlide(${i})"></div>`;
+                    i++;
+                });
+                if(!i){track.innerHTML='<div class="slide" style="color:#aaa">لا توجد إعلانات حالياً</div>';return}
+                currentSlide=0;
+                updateSliderPosition();
+                clearInterval(slideTimer);
+                slideTimer=setInterval(()=>{
+                    const t=document.querySelectorAll('.slide').length;
+                    if(t>1){currentSlide=(currentSlide+1)%t;updateSliderPosition()}
+                },4000)
+            }catch(e){track.innerHTML='<div class="slide" style="color:#aaa">تعذر تحميل الإعلانات</div>'}
+        }
+
+        function updateSliderPosition(){
+            $('slides-track').style.transform=`translateX(-${currentSlide*100}%)`;
+            document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===currentSlide))
+        }
+
+        function goToSlide(i){currentSlide=i;updateSliderPosition()}
+
+        async function checkNotifications(){
+            try{
+                const s=await db.collection('notifications').get();
+                const b=$('notif-count');
+                b.style.display=s.empty?'none':'flex';
+                b.textContent=s.size
+            }catch(e){}
+        }
+
+        async function openNotifs(){
+            show('notif-modal');
+            const list=$('notifs-list');
+            list.innerHTML='<div style="text-align:center;margin:20px">جاري التحميل...</div>';
+            try{
+                const s=await db.collection('notifications').orderBy('timestamp','desc').get();
+                list.innerHTML='';
+                if(s.empty){list.innerHTML='<div style="text-align:center;color:#aaa;margin:20px">لا توجد رسائل جديدة</div>';return}
+                s.forEach(doc=>{
+                    const n=doc.data();
+                    list.innerHTML+=`<div class="notif-item"><div class="notif-header"><img src="${escapeHTML(n.logo||'https://e.top4top.io/p_3899m302w0.png')}"><b>فريق الدعم</b><i class="fas fa-certificate verified-badge"></i></div><p style="margin:0;color:#cbd5e1;font-size:13px">${escapeHTML(n.message||'')}</p></div>`;
+                    db.collection('notifications').doc(doc.id).delete().catch(()=>{})
+                });
+                $('notif-count').style.display='none'
+            }catch(e){list.innerHTML='<div style="color:#ef4444;text-align:center">تعذر تحميل الإشعارات</div>'}
+        }
+
+        function closeNotifs(){hide('notif-modal');checkNotifications()}
+
+        // جدول المباريات
+        const MATCHES_API_BASE = 'https://dev-kaidn.pantheonsite.io/kidntv/ya2.php';
+
+        async function openMatches() {
+            history.pushState({roshanMatches:true},'',location.href);
+            show('matches-modal', 'flex');
+            hide('notif-btn');
+            hide('matches-btn');
+            const grid = $('matches-grid');
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 50px 0;"><div class="loading-spinner"></div><div style="color:var(--muted);font-weight:700;">جاري تحميل المباريات...</div></div>';
+            try {
+                const res = await fetch(`${MATCHES_API_BASE}?path=events`);
+                const data = await res.json();
+                let events = data.data || data || [];
+                if (!Array.isArray(events) || events.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 50px 0; color:var(--muted);"><i class="fas fa-trophy" style="font-size:36px;margin-bottom:12px;color:rgba(255,255,255,0.2)"></i><p>لا توجد مباريات متاحة حالياً.</p></div>';
+                    return;
+                }
+                grid.innerHTML = events.map(event => renderMatchCard(event)).join('');
+            } catch (e) {
+                console.error('Error loading matches:', e);
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 50px 0; color:var(--danger);"><i class="fas fa-triangle-exclamation" style="font-size:36px;margin-bottom:12px;"></i><p>حدث خطأ أثناء تحميل جدول المباريات.</p></div>';
+            }
+        }
+
+        function closeMatches(fromBack = false) {
+            hide('matches-modal');
+            show('notif-btn');
+            show('matches-btn');
+            if (fromBack && history.state?.roshanMatches) {
+                try { history.back(); } catch (e) {}
+            }
+        }
+
+        function getMatchStatus(startTime, endTime) {
+            const now = Math.floor(Date.now() / 1000);
+            if (now >= startTime && now <= endTime) {
+                return { text: 'جارية', cardClass: 'live', dotClass: 'dot-live' };
+            } else if (now > endTime) {
+                return { text: 'منتهية', cardClass: 'finished', dotClass: 'dot-finished' };
+            }
+            return { text: 'قريباً', cardClass: 'upcoming', dotClass: 'dot-upcoming' };
+        }
+
+        function formatMatchTime(timestamp) {
+            const dateObj = new Date(timestamp * 1000);
+            return dateObj.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit', hour12: true });
+        }
+
+        function renderMatchCard(event) {
+            const status = getMatchStatus(event.start_time, event.end_time);
+            const timeStr = formatMatchTime(event.start_time);
+            const t1s = event.team_1_score;
+            const t2s = event.team_2_score;
+            const hasScore = (t1s !== undefined && t2s !== undefined && t1s !== "" && t2s !== "");
+            
+            const scoreOrTime = hasScore ? `${t1s} - ${t2s}` : (event.score || timeStr);
+            const scoreClass = hasScore ? 'match-score numeric' : 'match-score';
+
+            const team1Name = event.team_1 ? event.team_1.name : '';
+            const team1Logo = event.team_1?.logo || 'https://e.top4top.io/p_3899m302w0.png';
+            const team2Name = event.team_2 ? event.team_2.name : '';
+            const team2Logo = event.team_2?.logo || 'https://e.top4top.io/p_3899m302w0.png';
+            const leagueName = event.champions || event.league || 'غير معروف';
+            const channelName = event.channel || 'غير معروفة';
+            const commentaryName = event.commentary || 'غير معروف';
+
+            return `
+            <div class="match-card">
+                <div class="match-teams">
+                    <div class="team-col">
+                        <img src="${escapeHTML(team1Logo)}" alt="${escapeHTML(team1Name)}" onerror="this.src='https://e.top4top.io/p_3899m302w0.png'">
+                        <span class="team-name" title="${escapeHTML(team1Name)}">${escapeHTML(team1Name)}</span>
+                    </div>
+                    <div class="score-col">
+                        <span class="${scoreClass}">${escapeHTML(scoreOrTime)}</span>
+                        <div class="status-badge ${status.cardClass}">
+                            <span class="${status.dotClass}"></span>
+                            <span>${status.text}</span>
+                        </div>
+                    </div>
+                    <div class="team-col">
+                        <img src="${escapeHTML(team2Logo)}" alt="${escapeHTML(team2Name)}" onerror="this.src='https://e.top4top.io/p_3899m302w0.png'">
+                        <span class="team-name" title="${escapeHTML(team2Name)}">${escapeHTML(team2Name)}</span>
+                    </div>
+                </div>
+                <div class="match-details">
+                    <div title="${escapeHTML(channelName)}"><i class="fas fa-tv"></i> ${escapeHTML(channelName)}</div>
+                    <div title="${escapeHTML(commentaryName)}"><i class="fas fa-microphone"></i> ${escapeHTML(commentaryName)}</div>
+                    <div title="${escapeHTML(leagueName)}"><i class="fas fa-trophy"></i> ${escapeHTML(leagueName)}</div>
+                </div>
+            </div>`;
+        }
+
+        async function loadCategories(){
+            const app=$('app');
+            app.innerHTML='';
+            try{
+                const snap=await db.collection('categories').get();
+                if(snap.empty){app.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:30px">لا توجد أقسام حالياً</div>';return}
+                snap.forEach(doc=>{
+                    const c=doc.data(),d=document.createElement('div');
+                    d.className='category-box';
+                    d.onclick=()=>loadChannels(doc.id,c.name||'القنوات');
+                    d.innerHTML=`<img class="category-img" src="${escapeHTML(c.logo||'https://e.top4top.io/p_3899m302w0.png')}"><div class="category-title">${escapeHTML(c.name||'قسم')}</div>`;
+                    app.appendChild(d)
+                })
+            }catch(e){app.innerHTML='<div style="grid-column:1/-1;text-align:center;color:#ef4444;padding:30px">تعذر تحميل الأقسام</div>'}
+        }
+
+        async function loadChannels(catId,catName){
+            const list=$('channels-list');
+            list.innerHTML='';
+            $('chan-modal-title').innerHTML=`<i class="fas fa-tv" style="color:var(--blue);"></i> ${escapeHTML(catName)}`;
+            try{
+                const snap=await db.collection('channels').where('categoryId','==',catId).get();
+                if(snap.empty){show('error-popup');return}
+                show('channel-modal');
+                hide('notif-btn');
+                hide('matches-btn');
+                $('back-btn').style.display='flex';
+                snap.forEach(doc=>{
+                    const c=doc.data(),d=document.createElement('div');
+                    d.className='channel-item';
+                    d.onclick=()=>openPlayer(c);
+                    d.innerHTML=`<img src="${escapeHTML(c.logo||'https://e.top4top.io/p_3899m302w0.png')}"><div class="channel-name">${escapeHTML(c.name||'قناة')}</div>`;
+                    list.appendChild(d)
+                })
+            }catch(e){show('error-popup')}
+        }
+
+        function closeError(){hide('error-popup')}
+        
+        function closeChannels(){
+            hide('channel-modal');
+            $('back-btn').style.display='none';
+            show('notif-btn');
+            show('matches-btn');
+        }
+
+        let player=null,hlsInstance=null,dashInstance=null,currentServers=[],currentServerIndex=0,retryTimer=null,uiHideTimer=null,serverPanelTimer=null,playerOpen=false;
+
+        function initPlayer(){
+            if(player)return;
+            player=new Plyr('#player',{
+                controls:['play-large','play','progress','current-time','duration','mute','volume','settings','fullscreen'],
+                settings:['quality','speed'],autoplay:true,clickToPlay:true,hideControls:true,resetOnEnd:false,disableContextMenu:true,live:true,ratio:'16:9'
+            });
+        }
+
+        function normalizeServers(ch){
+            let s=Array.isArray(ch.servers)?ch.servers.filter(x=>x&&x.url):[];
+            if(!s.length&&Array.isArray(ch.serverList))s=ch.serverList.filter(x=>x&&x.url);
+            if(!s.length&&ch.server1)s.push({name:ch.server1Name||'السيرفر الأول',url:ch.server1,headers:ch.server1Headers});
+            if(ch.server2)s.push({name:ch.server2Name||'السيرفر الثاني',url:ch.server2,headers:ch.server2Headers});
+            if(ch.server3)s.push({name:ch.server3Name||'السيرفر الثالث',url:ch.server3,headers:ch.server3Headers});
+            if(!s.length&&ch.streamUrl)s=[{name:ch.serverName||'السيرفر الأساسي',url:ch.streamUrl,headers:ch.headers}];
+            return s;
+        }
+
+        function getCustomHeaders(s){
+            const h=s.headers||{},r={};
+            const ua=h['User-Agent']||h.userAgent||h.user_agent;if(ua)r['User-Agent']=ua;
+            const ref=h.Referer||h.referer;if(ref)r.Referer=ref;
+            const org=h.Origin||h.origin;if(org)r.Origin=org;
+            Object.keys(h).forEach(k=>{if(!['User-Agent','userAgent','user_agent','Referer','referer','Origin','origin'].includes(k))r[k]=h[k]});
+            return Object.keys(r).length?r:null;
+        }
+
+        const MIN_VOLUME=0,MAX_VOLUME=1,DEFAULT_VOLUME=0.8;
+        let lastVolume=DEFAULT_VOLUME;
+        
+        function clampVolume(v){
+            const n=Number(v);
+            if(!Number.isFinite(n))return DEFAULT_VOLUME;
+            return Math.max(MIN_VOLUME,Math.min(MAX_VOLUME,n));
+        }
+
+        async function ensureAudioPlayback(){
+            const video=$('player');
+            if(!video)return false;
+            video.muted=false;
+            if(video.volume<=MIN_VOLUME)video.volume=clampVolume(lastVolume||DEFAULT_VOLUME);
+            video.volume=clampVolume(video.volume);
+            updateVolumeUI();
+            try{
+                await video.play();
+                hidePlayerStatus();
+                updatePlayButton();
+                return true;
+            }catch(e){
+                showPlayerStatus('اضغط على الشاشة لتشغيل البث والصوت','fa-volume-high');
+                return false;
+            }
+        }
+
+        async function openPlayer(ch){
+            playerOpen=true;
+            history.pushState({roshanPlayer:true},'',location.href);
+            $('player-modal').style.display='block';
+            document.body.classList.add('player-open');
+            initPlayer();
+            const video=$('player');
+            video.autoplay=true;video.muted=false;video.volume=DEFAULT_VOLUME;lastVolume=DEFAULT_VOLUME;
+            updateVolumeUI();
+            hidePlayerUI();updateVolumeUI();
+            currentServers=normalizeServers(ch);currentServerIndex=0;buildServerPanel();
+            if(!currentServers.length){showPlayerStatus('لا توجد مصادر بث لهذه القناة','fa-triangle-exclamation');return}
+            await requestPlayerFullscreenAndLandscape();
+            await loadServer(0);
+            showPlayerUI();
+        }
+
+        async function requestPlayerFullscreenAndLandscape(){
+            try{
+                const target=$('player-wrapper');
+                if(!document.fullscreenElement){
+                    if(target.requestFullscreen)await target.requestFullscreen({navigationUI:'hide'});
+                    else if(target.webkitRequestFullscreen)target.webkitRequestFullscreen();
+                }
+            }catch(e){console.log('Fullscreen:',e)}
+            try{
+                if(screen.orientation && screen.orientation.lock){
+                    await screen.orientation.lock('landscape');
+                }
+            }catch(e){console.log('Orientation lock:',e)}
+        }
+
+        function buildServerPanel(){
+            const box=$('server-buttons');box.innerHTML='';
+            if(currentServers.length===1){
+                box.innerHTML=`<div class="single-server-name"><i class="fas fa-server"></i> ${escapeHTML(currentServers[0].name||'السيرفر الأساسي')}</div><div class="server-panel-hint">السيرفر المتاح حالياً</div>`;
+                return;
+            }
+            currentServers.forEach((s,i)=>{
+                const b=document.createElement('button');
+                b.className='server-button';b.type='button';
+                b.innerHTML=`<i class="fas fa-server"></i> ${escapeHTML(s.name||'سيرفر '+(i+1))}`;
+                b.onclick=async e=>{e.stopPropagation();await loadServer(i);showServerPanel()};
+                box.appendChild(b)
+            });
+            box.insertAdjacentHTML('beforeend','<div class="server-panel-hint">اضغط على السيرفر للتبديل</div>');
+            updateServerButtons()
+        }
+
+        function updateServerButtons(){document.querySelectorAll('.server-button').forEach((b,i)=>b.classList.toggle('active',i===currentServerIndex))}
+
+        async function loadServer(index){
+            if(!currentServers[index])return;
+            clearTimeout(retryTimer);destroyStream(false);currentServerIndex=index;updateServerButtons();
+            const s=currentServers[index],url=String(s.url);
+            showPlayerStatus('جاري الاتصال بـ '+(s.name||'السيرفر'),'fa-circle-notch fa-spin');
+            const video=$('player');video.removeAttribute('src');video.load();
+            try{
+                const l=url.toLowerCase();
+                if(l.includes('.m3u8')||l.includes('m3u8'))await loadHLS(video,url,s);
+                else if(l.includes('.mpd')||l.includes('manifest.mpd'))await loadDASH(video,url,s);
+                else await loadNative(video,url);
+                hidePlayerStatus();
+                try{await video.play()}catch(e){video.muted=true;try{await video.play()}catch(e2){showPlayerStatus('اضغط على الشاشة لبدء البث','fa-play')}}
+                showPlayerUI()
+            }catch(e){console.error(e);fallbackToNextServer()}
+        }
+
+        function loadHLS(video,url,s){
+            return new Promise((resolve,reject)=>{
+                let done=false;
+                const finish=(ok,err)=>{if(done)return;done=true;cleanup();ok?resolve():reject(err)};
+                const cleanup=()=>{try{hlsInstance?.off(Hls.Events.MANIFEST_PARSED,ok)}catch(e){}try{hlsInstance?.off(Hls.Events.ERROR,onError)}catch(e){}};
+                const ok=()=>finish(true),onError=(ev,d)=>{if(!d?.fatal)return;if(d.type===Hls.ErrorTypes.NETWORK_ERROR){try{hlsInstance.startLoad();return}catch(e){}}if(d.type===Hls.ErrorTypes.MEDIA_ERROR){try{hlsInstance.recoverMediaError();return}catch(e){}}finish(false,new Error(d.details||'HLS error'))};
+                if(Hls.isSupported()){
+                    const h=getCustomHeaders(s),cfg={enableWorker:true,lowLatencyMode:true,backBufferLength:20,maxBufferLength:45,maxMaxBufferLength:90,liveSyncDurationCount:3,liveMaxLatencyDurationCount:8};
+                    if(h)cfg.xhrSetup=x=>Object.keys(h).forEach(k=>{try{x.setRequestHeader(k,h[k])}catch(e){}});
+                    hlsInstance=new Hls(cfg);hlsInstance.on(Hls.Events.MANIFEST_PARSED,ok);hlsInstance.on(Hls.Events.ERROR,onError);hlsInstance.loadSource(url);hlsInstance.attachMedia(video)
+                }else if(video.canPlayType('application/vnd.apple.mpegurl')){video.src=url;video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',()=>finish(false),{once:true});video.load()}
+                else finish(false,new Error('HLS غير مدعوم'))
+            })
+        }
+
+        function loadDASH(video,url,s){
+            return new Promise((resolve,reject)=>{
+                if(typeof dashjs==='undefined')return reject(new Error('DASH unavailable'));
+                dashInstance=dashjs.MediaPlayer().create();
+                dashInstance.updateSettings({streaming:{liveDelay:3,stableBufferTime:10}});
+                const done=()=>{cleanup();resolve()},bad=()=>{cleanup();reject(new Error('DASH error'))},cleanup=()=>{try{dashInstance.off(dashjs.MediaPlayer.events.STREAM_INITIALIZED,done);dashInstance.off(dashjs.MediaPlayer.events.ERROR,bad)}catch(e){}};
+                const h=getCustomHeaders(s);
+                if(s.drm?.licenseUrl)dashInstance.setProtectionData({[s.drm.keySystem||'com.widevine.alpha']:{serverURL:s.drm.licenseUrl,httpRequestHeaders:h||{}}});
+                dashInstance.initialize(video,url,false);dashInstance.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED,done);dashInstance.on(dashjs.MediaPlayer.events.ERROR,bad);
+                setTimeout(()=>bad(),15000)
+            })
+        }
+
+        function loadNative(video,url){
+            return new Promise((resolve,reject)=>{
+                let ok=false;
+                const success=()=>{if(ok)return;ok=true;cleanup();resolve()},bad=()=>{if(ok)return;ok=true;cleanup();reject(new Error('video error'))},cleanup=()=>{video.removeEventListener('loadedmetadata',success);video.removeEventListener('canplay',success);video.removeEventListener('error',bad)};
+                video.addEventListener('loadedmetadata',success,{once:true});video.addEventListener('canplay',success,{once:true});video.addEventListener('error',bad,{once:true});
+                video.src=url;video.load();
+                setTimeout(()=>{if(!ok)bad()},10000)
+            })
+        }
+
+        function fallbackToNextServer(){
+            if(currentServerIndex<currentServers.length-1){
+                showPlayerStatus('السيرفر لا يستجيب، جاري الانتقال للمصدر التالي','fa-right-left');
+                retryTimer=setTimeout(()=>loadServer(currentServerIndex+1),700)
+            }else showPlayerStatus('تعذر تشغيل جميع مصادر البث','fa-triangle-exclamation')
+        }
+
+        function destroyStream(clear=true){
+            clearTimeout(retryTimer);
+            if(hlsInstance){try{hlsInstance.destroy()}catch(e){}hlsInstance=null}
+            if(dashInstance){try{dashInstance.reset()}catch(e){}dashInstance=null}
+            if(clear){const v=$('player');try{v.pause()}catch(e){}v.removeAttribute('src');v.load()}
+        }
+
+        function showPlayerStatus(t,i){
+            $('player-status').classList.add('show');
+            $('player-status').innerHTML=`<i class="fas ${i}"></i><div class="player-status-text">${escapeHTML(t)}</div>`
+        }
+
+        function hidePlayerStatus(){$('player-status').classList.remove('show')}
+
+        function showPlayerUI(){
+            const w=$('player-wrapper');w.classList.add('ui-visible');
+            updatePlayButton();updateVolumeUI();updateServerButtons();
+            clearTimeout(uiHideTimer);
+            uiHideTimer=setTimeout(()=>{w.classList.remove('ui-visible');$('server-panel').classList.remove('show')},5500)
+        }
+
+        function hidePlayerUI(){
+            clearTimeout(uiHideTimer);
+            $('player-wrapper').classList.remove('ui-visible');
+            $('server-panel').classList.remove('show')
+        }
+
+        function showServerPanel(){
+            if(currentServers.length<2)return;
+            const p=$('server-panel');p.classList.add('show');
+            clearTimeout(serverPanelTimer);
+            serverPanelTimer=setTimeout(()=>p.classList.remove('show'),6000)
+        }
+
+        function togglePlay(e){
+            e?.stopPropagation();
+            if(!player)return;
+            if(player.playing){player.pause()}else{ensureAudioPlayback()}
+            showPlayerUI();updatePlayButton()
+        }
+
+        function updatePlayButton(){const b=$('center-play');if(b&&player)b.innerHTML=player.playing?'<i class="fas fa-pause"></i>':'<i class="fas fa-play"></i>'}
+
+        function setVolume(v,e){
+            e?.stopPropagation();
+            const video=$('player');if(!video)return;
+            const x=clampVolume(v);
+            if(x<=MIN_VOLUME){video.volume=0;video.muted=true}else{video.volume=x;video.muted=false;lastVolume=x}
+            updateVolumeUI();showPlayerUI()
+        }
+
+        function changeVolume(d,e){
+            e?.stopPropagation();
+            const video=$('player');if(!video)return;
+            const current=video.muted?0:clampVolume(video.volume);
+            setVolume(current+Number(d))
+        }
+
+        function toggleMute(e){
+            e?.stopPropagation();
+            const video=$('player');if(!video)return;
+            if(video.muted||video.volume<=MIN_VOLUME){
+                video.volume=clampVolume(lastVolume||DEFAULT_VOLUME);
+                if(video.volume<=MIN_VOLUME)video.volume=DEFAULT_VOLUME;
+                video.muted=false;ensureAudioPlayback()
+            }else{
+                lastVolume=clampVolume(video.volume);
+                video.muted=true;updateVolumeUI()
+            }
+            showPlayerUI()
+        }
+
+        function updateVolumeUI(){
+            const v=$('player'),r=$('volume-level'),p=$('volume-percent'),m=$('mute-btn');
+            if(!v||!r)return;
+            const value=(v.muted||v.volume<=MIN_VOLUME)?0:clampVolume(v.volume);
+            r.value=value;p.textContent=Math.round(value*100)+'%';
+            m.innerHTML=value<=0?'<i class="fas fa-volume-xmark"></i>':value<0.5?'<i class="fas fa-volume-low"></i>':'<i class="fas fa-volume-high"></i>'
+        }
+
+        async function closePlayer(fromBack=false){
+            lastVolume=DEFAULT_VOLUME;
+            if(!playerOpen && $('player-modal').style.display!=='block')return;
+            playerOpen=false;hidePlayerUI();hidePlayerStatus();
+            clearTimeout(serverPanelTimer);destroyStream(true);
+            $('player-modal').style.display='none';
+            document.body.classList.remove('player-open');
+            try{if(document.fullscreenElement)await document.exitFullscreen()}catch(e){}
+            try{if(screen.orientation?.unlock)screen.orientation.unlock()}catch(e){}
+            if(fromBack && history.state?.roshanPlayer){
+                try{history.back()}catch(e){}
+            }
+        }
+
+        window.addEventListener('popstate',async()=>{
+            if(playerOpen){await closePlayer(false);return}
+            if($('channel-modal').style.display==='flex'){closeChannels();return}
+            if($('matches-modal').style.display==='flex'){closeMatches(false);return}
+        });
+
+        document.addEventListener('backbutton',e=>{
+            if(playerOpen){e.preventDefault?.();closePlayer(true)}
+            if($('matches-modal').style.display==='flex'){e.preventDefault?.();closeMatches(true)}
+        });
+
+        document.addEventListener('fullscreenchange',()=>{
+            if(!document.fullscreenElement){try{screen.orientation?.unlock()}catch(e){}}
+        });
+
+        $('player-wrapper').addEventListener('pointerup',e=>{
+            if(e.target.closest('button,input,.server-panel,.plyr__controls'))return;
+            showPlayerUI();
+            const video=$('player');
+            if(video&&(video.paused||video.muted||video.volume<=MIN_VOLUME))ensureAudioPlayback();
+        });
+
+        $('player').addEventListener('pointerup',()=>{
+            showPlayerUI();
+            const video=$('player');
+            if(video&&(video.paused||video.muted||video.volume<=MIN_VOLUME))ensureAudioPlayback();
+        });
+
+        $('player').addEventListener('play',updatePlayButton);
+        $('player').addEventListener('pause',updatePlayButton);
+        $('player').addEventListener('volumechange',updateVolumeUI);
+        $('player').addEventListener('error',()=>{if(playerOpen)fallbackToNextServer()});
+
+        checkWelcomeScreen();
+        checkNotifications();
+        loadAds();
+        loadCategories();
+    </script>
+</body>
+</html>
